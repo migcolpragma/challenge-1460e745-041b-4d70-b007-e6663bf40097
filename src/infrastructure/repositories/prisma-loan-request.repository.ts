@@ -4,8 +4,10 @@ import { LoanRequest, LoanRequestStatus } from '../../domain/entities/loan-reque
 import { LoanRequestRepository } from '../../domain/ports/loan-request.repository';
 
 @Injectable()
-export class PrismaLoanRequestRepository implements LoanRequestRepository {
-  constructor(private readonly prisma: PrismaService) {}
+export class PrismaLoanRequestRepository extends LoanRequestRepository {
+  constructor(private readonly prisma: PrismaService) {
+    super();
+  }
 
   async create(loanRequest: LoanRequest): Promise<LoanRequest> {
     const created = await this.prisma.loanRequest.create({
@@ -13,9 +15,13 @@ export class PrismaLoanRequestRepository implements LoanRequestRepository {
         id: loanRequest.id,
         operationNumber: loanRequest.operationNumber,
         channel: loanRequest.channel,
-        amount: loanRequest.amount,
+        applicantName: loanRequest.applicantName,
+        applicantDocument: loanRequest.applicantDocument,
+        requestedAmount: loanRequest.requestedAmount,
+        currency: loanRequest.currency,
         termMonths: loanRequest.termMonths,
-        customerId: loanRequest.customerId,
+        interestRate: loanRequest.interestRate,
+        destinationAccount: loanRequest.destinationAccount,
         status: loanRequest.status,
         createdAt: loanRequest.createdAt,
         updatedAt: loanRequest.updatedAt,
@@ -28,9 +34,7 @@ export class PrismaLoanRequestRepository implements LoanRequestRepository {
   }
 
   async findById(id: string): Promise<LoanRequest | null> {
-    const loanRequest = await this.prisma.loanRequest.findUnique({
-      where: { id },
-    });
+    const loanRequest = await this.prisma.loanRequest.findUnique({ where: { id } });
     return loanRequest ? this.mapToDomain(loanRequest) : null;
   }
 
@@ -75,29 +79,31 @@ export class PrismaLoanRequestRepository implements LoanRequestRepository {
 
   async findAll(): Promise<LoanRequest[]> {
     const loanRequests = await this.prisma.loanRequest.findMany();
-    return loanRequests.map(this.mapToDomain);
+    return loanRequests.map((lr) => this.mapToDomain(lr));
   }
 
   async delete(id: string): Promise<void> {
-    await this.prisma.loanRequest.delete({
-      where: { id },
-    });
+    await this.prisma.loanRequest.delete({ where: { id } });
   }
 
-  private mapToDomain(prismaLoanRequest: any): LoanRequest {
+  private mapToDomain(p: any): LoanRequest {
     return new LoanRequest(
-      prismaLoanRequest.id,
-      prismaLoanRequest.operationNumber,
-      prismaLoanRequest.channel,
-      prismaLoanRequest.amount,
-      prismaLoanRequest.termMonths,
-      prismaLoanRequest.customerId,
-      prismaLoanRequest.status as LoanRequestStatus,
-      prismaLoanRequest.createdAt,
-      prismaLoanRequest.updatedAt,
-      prismaLoanRequest.antifraudResult,
-      prismaLoanRequest.riskBureauResult,
-      prismaLoanRequest.creditOriginatorResult
+      p.id,
+      p.operationNumber,
+      p.channel,
+      p.applicantName,
+      p.applicantDocument,
+      p.requestedAmount,
+      p.currency,
+      p.termMonths,
+      p.interestRate,
+      p.destinationAccount,
+      p.status as LoanRequestStatus,
+      p.createdAt,
+      p.updatedAt,
+      p.antifraudResult,
+      p.riskBureauResult,
+      p.creditOriginatorResult,
     );
   }
 }

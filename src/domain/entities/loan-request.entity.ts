@@ -4,7 +4,8 @@ export enum LoanRequestStatus {
   PENDING = 'PENDING',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
-  TIMEOUT = 'TIMEOUT'
+  TIMEOUT = 'TIMEOUT',
+  PENDING_ANTIFRAUD = 'PENDING_ANTIFRAUD',
 }
 
 export class LoanRequest {
@@ -17,14 +18,26 @@ export class LoanRequest {
   @IsString()
   channel: string;
 
+  @IsString()
+  applicantName: string;
+
+  @IsString()
+  applicantDocument: string;
+
   @IsNumber()
-  amount: number;
+  requestedAmount: number;
+
+  @IsString()
+  currency: string;
 
   @IsNumber()
   termMonths: number;
 
+  @IsNumber()
+  interestRate: number;
+
   @IsString()
-  customerId: string;
+  destinationAccount: string;
 
   @IsEnum(LoanRequestStatus)
   status: LoanRequestStatus;
@@ -35,35 +48,38 @@ export class LoanRequest {
   @IsDate()
   updatedAt: Date;
 
-  @IsString()
-  antifraudResult?: string;
-
-  @IsString()
-  riskBureauResult?: string;
-
-  @IsString()
-  creditOriginatorResult?: string;
+  antifraudResult?: string | null;
+  riskBureauResult?: string | null;
+  creditOriginatorResult?: string | null;
 
   constructor(
     id: string,
     operationNumber: string,
     channel: string,
-    amount: number,
+    applicantName: string,
+    applicantDocument: string,
+    requestedAmount: number,
+    currency: string,
     termMonths: number,
-    customerId: string,
+    interestRate: number,
+    destinationAccount: string,
     status: LoanRequestStatus = LoanRequestStatus.PENDING,
     createdAt: Date = new Date(),
     updatedAt: Date = new Date(),
-    antifraudResult?: string,
-    riskBureauResult?: string,
-    creditOriginatorResult?: string
+    antifraudResult?: string | null,
+    riskBureauResult?: string | null,
+    creditOriginatorResult?: string | null,
   ) {
     this.id = id;
     this.operationNumber = operationNumber;
     this.channel = channel;
-    this.amount = amount;
+    this.applicantName = applicantName;
+    this.applicantDocument = applicantDocument;
+    this.requestedAmount = requestedAmount;
+    this.currency = currency;
     this.termMonths = termMonths;
-    this.customerId = customerId;
+    this.interestRate = interestRate;
+    this.destinationAccount = destinationAccount;
     this.status = status;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
