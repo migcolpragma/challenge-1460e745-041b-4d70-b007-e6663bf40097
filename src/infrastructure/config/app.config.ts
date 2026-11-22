@@ -11,6 +11,8 @@ interface AppConfig {
     username: string;
     password: string;
     name: string;
+    poolSize: number;
+    connectTimeoutMs: number;
   };
   app: {
     host: string;
@@ -37,6 +39,10 @@ interface AppConfig {
       retryAttempts: number;
     };
   };
+  idempotency: {
+    checkEnabled: boolean;
+  };
+  externalUrl: string;
 }
 
 @Global()
@@ -52,6 +58,8 @@ interface AppConfig {
         DB_USERNAME: Joi.string().default('postgres'),
         DB_PASSWORD: Joi.string().required(),
         DB_NAME: Joi.string().default('loan_db'),
+        DATABASE_POOL_SIZE: Joi.number().default(10),
+        DATABASE_CONNECT_TIMEOUT_MS: Joi.number().default(10000),
         APP_HOST: Joi.string().default('0.0.0.0'),
         APP_PORT: Joi.number().default(3000),
         NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
@@ -65,6 +73,8 @@ interface AppConfig {
         RISK_BUREAU_RETRY_ATTEMPTS: Joi.number().default(3),
         CREDIT_ORIGINATOR_TIMEOUT: Joi.number().default(2000),
         CREDIT_ORIGINATOR_RETRY_ATTEMPTS: Joi.number().default(3),
+        IDEMPOTENCY_CHECK_ENABLED: Joi.boolean().default(true),
+        URL_EXTERNA_EJERCICIO: Joi.string().default('https://httpbin.org/delay/1'),
       }),
       validationOptions: {
         allowUnknown: true,
@@ -84,6 +94,8 @@ interface AppConfig {
             username: configService.get<string>('DB_USERNAME')!,
             password: configService.get<string>('DB_PASSWORD')!,
             name: configService.get<string>('DB_NAME')!,
+            poolSize: configService.get<number>('DATABASE_POOL_SIZE')!,
+            connectTimeoutMs: configService.get<number>('DATABASE_CONNECT_TIMEOUT_MS')!,
           },
           app: {
             host: configService.get<string>('APP_HOST')!,
@@ -98,18 +110,22 @@ interface AppConfig {
           },
           services: {
             antifraud: {
-              timeout: configService.get<number>('ANTIFRAUD_TIMEOUT')!,
+              timeout: configService.get<number>('ANTIFRAUD_TIMEOUT_MS')!,
               retryAttempts: configService.get<number>('ANTIFRAUD_RETRY_ATTEMPTS')!,
             },
             riskBureau: {
-              timeout: configService.get<number>('RISK_BUREAU_TIMEOUT')!,
+              timeout: configService.get<number>('RISK_BUREAU_TIMEOUT_MS')!,
               retryAttempts: configService.get<number>('RISK_BUREAU_RETRY_ATTEMPTS')!,
             },
             creditOriginator: {
-              timeout: configService.get<number>('CREDIT_ORIGINATOR_TIMEOUT')!,
+              timeout: configService.get<number>('CREDIT_ORIGINATOR_TIMEOUT_MS')!,
               retryAttempts: configService.get<number>('CREDIT_ORIGINATOR_RETRY_ATTEMPTS')!,
             },
           },
+          idempotency: {
+            checkEnabled: configService.get<boolean>('IDEMPOTENCY_CHECK_ENABLED')!,
+          },
+          externalUrl: configService.get<string>('URL_EXTERNA_EJERCICIO')!,
         };
       },
       inject: [ConfigService],

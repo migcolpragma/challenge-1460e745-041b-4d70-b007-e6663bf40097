@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { HttpModule } from '@nestjs/axios';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { LoanRequestService } from './application/loan-request.service';
 import { LoanRequestRepository } from './domain/ports/loan-request.repository';
@@ -18,6 +19,7 @@ import { TransformInterceptor } from './infrastructure/interceptors/transform.in
       envFilePath: '.env',
       validationOptions: { allowUnknown: true, abortEarly: false },
     }),
+    HttpModule,
   ],
   controllers: [LoanRequestController],
   providers: [
