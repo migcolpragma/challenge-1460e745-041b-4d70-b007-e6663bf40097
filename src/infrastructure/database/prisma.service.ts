@@ -5,6 +5,19 @@ import { PrismaClient } from '@prisma/client';
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
 
+  constructor() {
+    const poolSize = process.env.DATABASE_POOL_SIZE ?? '10';
+    const connectTimeoutMs = Number(process.env.DATABASE_CONNECT_TIMEOUT_MS ?? '10000');
+    const connectTimeout = Math.floor(connectTimeoutMs / 1000);
+    super({
+      datasources: {
+        db: {
+          url: `${process.env.DATABASE_URL}?connection_limit=${poolSize}&connect_timeout=${connectTimeout}`,
+        },
+      },
+    });
+  }
+
   async onModuleInit(): Promise<void> {
     try {
       await this.$connect();

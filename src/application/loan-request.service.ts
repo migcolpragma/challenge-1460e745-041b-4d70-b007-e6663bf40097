@@ -1,4 +1,7 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 import { v4 as uuidv4 } from 'uuid';
 import { LoanRequest, LoanRequestStatus } from '../domain/entities/loan-request.entity';
 import { LoanRequestRepository } from '../domain/ports/loan-request.repository';
@@ -53,19 +56,45 @@ export class LoanRequestService {
   constructor(
     private readonly loanRequestRepository: LoanRequestRepository,
     private readonly winstonLogger: WinstonLogger,
+    private readonly configService: ConfigService,
+    private readonly httpService: HttpService,
   ) {}
+
+  private async callExternalWithTimeout(timeoutMs: number, context: string): Promise<void> {
+    const url = this.configService.get<string>('URL_EXTERNA_EJERCICIO')!;
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await firstValueFrom(
+          this.httpService.get(url, { timeout: timeoutMs }),
+        );
+        return;
+      } catch {
+        const backoff = attempt * 200;
+        this.winstonLogger.warn(`Intento ${attempt}/${maxRetries} fallido [${context}], reintentando en ${backoff}ms`);
+        if (attempt === maxRetries) {
+          this.winstonLogger.error(`Timeout en llamada externa [${context}] después de ${maxRetries} intentos`);
+          throw new HttpException(`Timeout en servicio externo: ${context}`, HttpStatus.GATEWAY_TIMEOUT);
+        }
+        await new Promise((resolve) => setTimeout(resolve, backoff));
+      }
+    }
+  }
 
   async createLoanRequest(input: CreateLoanRequestInput): Promise<LoanRequestResponse> {
     this.winstonLogger.info('Iniciando creación de solicitud de préstamo');
 
-    const existing = await this.loanRequestRepository.findByOperationNumberAndChannel(
-      input.operationNumber,
-      input.channel,
-    );
+    const idempotencyEnabled = this.configService.get<boolean>('IDEMPOTENCY_CHECK_ENABLED') ?? true;
 
-    if (existing) {
-      this.winstonLogger.warn('Solicitud duplicada detectada - idempotencia');
-      return this.mapToResponse(existing);
+    if (idempotencyEnabled) {
+      const existing = await this.loanRequestRepository.findByOperationNumberAndChannel(
+        input.operationNumber,
+        input.channel,
+      );
+      if (existing) {
+        this.winstonLogger.warn('Solicitud duplicada detectada - idempotencia');
+        return this.mapToResponse(existing);
+      }
     }
 
     const loanRequest = new LoanRequest(
@@ -121,18 +150,24 @@ export class LoanRequestService {
   }
 
   async updateAntifraudResult(input: UpdateAntifraudResultInput): Promise<LoanRequestResponse> {
+    const timeoutMs = this.configService.get<number>('ANTIFRAUD_TIMEOUT_MS')!;
+    await this.callExternalWithTimeout(timeoutMs, 'antifraud');
     this.winstonLogger.info('Actualizando resultado de antifraude', { requestId: input.id });
     const updated = await this.loanRequestRepository.updateAntifraudResult(input.id, input.result);
     return this.mapToResponse(updated);
   }
 
   async updateRiskBureauResult(input: UpdateRiskBureauResultInput): Promise<LoanRequestResponse> {
+    const timeoutMs = this.configService.get<number>('RISK_BUREAU_TIMEOUT_MS')!;
+    await this.callExternalWithTimeout(timeoutMs, 'risk-bureau');
     this.winstonLogger.info('Actualizando resultado del buró de riesgos', { requestId: input.id });
     const updated = await this.loanRequestRepository.updateRiskBureauResult(input.id, input.result);
     return this.mapToResponse(updated);
   }
 
   async updateCreditOriginatorResult(input: UpdateCreditOriginatorResultInput): Promise<LoanRequestResponse> {
+    const timeoutMs = this.configService.get<number>('CREDIT_ORIGINATOR_TIMEOUT_MS')!;
+    await this.callExternalWithTimeout(timeoutMs, 'credit-originator');
     this.winstonLogger.info('Actualizando resultado del originador de crédito', { requestId: input.id });
     const updated = await this.loanRequestRepository.updateCreditOriginatorResult(input.id, input.result);
     return this.mapToResponse(updated);

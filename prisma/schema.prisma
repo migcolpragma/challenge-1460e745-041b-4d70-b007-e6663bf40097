@@ -16,7 +16,7 @@ model LoanRequest {
   requestedAmount        Decimal           @db.Decimal(15, 2)
   currency               String
   termMonths             Int
-  interestRate           Decimal           @db.Decimal(5, 4)
+  interestRate           Decimal           @db.Decimal(10, 4)
   destinationAccount     String
   status                 LoanRequestStatus @default(PENDING)
   antifraudResult        String?
