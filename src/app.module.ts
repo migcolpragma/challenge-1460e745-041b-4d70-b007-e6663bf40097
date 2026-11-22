@@ -1,11 +1,10 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { HttpModule } from '@nestjs/axios';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { AppConfigModule } from './infrastructure/config/app.config';
 import { LoanRequestService } from './application/loan-request.service';
 import { LoanRequestRepository } from './domain/ports/loan-request.repository';
 import { PrismaLoanRequestRepository } from './infrastructure/repositories/prisma-loan-request.repository';
-import { PrismaService } from './infrastructure/database/prisma.service';
 import { WinstonLogger } from './infrastructure/logging/winston.logger';
 import { LoanRequestController } from './infrastructure/controllers/loan-request.controller';
 import { HttpExceptionFilter } from './infrastructure/filters/http-exception.filter';
@@ -14,16 +13,11 @@ import { TransformInterceptor } from './infrastructure/interceptors/transform.in
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: '.env',
-      validationOptions: { allowUnknown: true, abortEarly: false },
-    }),
+    AppConfigModule,
     HttpModule,
   ],
   controllers: [LoanRequestController],
   providers: [
-    PrismaService,
     WinstonLogger,
     {
       provide: LoanRequestRepository,

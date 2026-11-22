@@ -2,6 +2,7 @@ import { Injectable, LoggerService } from '@nestjs/common';
 import * as winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 import { ConfigService } from '@nestjs/config';
+import { sanitize, sanitizeFormat } from './logger.utils';
 
 export interface LogMetadata {
   [key: string]: unknown;
@@ -20,8 +21,9 @@ export class WinstonLogger implements LoggerService {
       new winston.transports.Console({
         level: logLevel,
         format: this.isProduction
-          ? winston.format.combine(winston.format.timestamp(), winston.format.json())
+          ? winston.format.combine(sanitizeFormat, winston.format.timestamp(), winston.format.json())
           : winston.format.combine(
+              sanitizeFormat,
               winston.format.colorize(),
               winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
               winston.format.printf(({ timestamp, level, message, context, ...meta }) => {
@@ -42,7 +44,7 @@ export class WinstonLogger implements LoggerService {
           maxSize: '20m',
           maxFiles: '14d',
           zippedArchive: true,
-          format: winston.format.combine(winston.format.timestamp(), winston.format.json()),
+          format: winston.format.combine(sanitizeFormat, winston.format.timestamp(), winston.format.json()),
         }),
         new DailyRotateFile({
           filename: 'logs/combined-%DATE%.log',
@@ -50,7 +52,7 @@ export class WinstonLogger implements LoggerService {
           maxSize: '20m',
           maxFiles: '14d',
           zippedArchive: true,
-          format: winston.format.combine(winston.format.timestamp(), winston.format.json()),
+          format: winston.format.combine(sanitizeFormat, winston.format.timestamp(), winston.format.json()),
         }),
       );
     }
@@ -58,6 +60,7 @@ export class WinstonLogger implements LoggerService {
     this.logger = winston.createLogger({
       level: logLevel,
       format: winston.format.combine(
+        sanitizeFormat,
         winston.format.timestamp(),
         winston.format.errors({ stack: true }),
         winston.format.json(),
@@ -69,27 +72,27 @@ export class WinstonLogger implements LoggerService {
   }
 
   log(level: string, message: string, metadata?: LogMetadata): void {
-    this.logger.log(level, message, metadata ?? {});
+    this.logger.log(level, message, sanitize(metadata ?? {}) as LogMetadata);
   }
 
   info(message: string, metadata?: LogMetadata): void {
-    this.logger.info(message, metadata ?? {});
+    this.logger.info(message, sanitize(metadata ?? {}) as LogMetadata);
   }
 
   error(message: string, trace?: string, context?: string, metadata?: LogMetadata): void {
-    this.logger.error(message, { trace, context, ...metadata });
+    this.logger.error(message, sanitize({ trace, context, ...metadata }) as LogMetadata);
   }
 
   warn(message: string, context?: string, metadata?: LogMetadata): void {
-    this.logger.warn(message, { context, ...metadata });
+    this.logger.warn(message, sanitize({ context, ...metadata }) as LogMetadata);
   }
 
   debug(message: string, context?: string, metadata?: LogMetadata): void {
-    this.logger.debug(message, { context, ...metadata });
+    this.logger.debug(message, sanitize({ context, ...metadata }) as LogMetadata);
   }
 
   verbose(message: string, context?: string, metadata?: LogMetadata): void {
-    this.logger.verbose(message, { context, ...metadata });
+    this.logger.verbose(message, sanitize({ context, ...metadata }) as LogMetadata);
   }
 
   getLogger(): winston.Logger {

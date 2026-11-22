@@ -1,6 +1,6 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, HttpException, HttpStatus, Inject } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import { AppConfig } from '../infrastructure/config/app.config';
 import { firstValueFrom } from 'rxjs';
 import { v4 as uuidv4 } from 'uuid';
 import { LoanRequest, LoanRequestStatus } from '../domain/entities/loan-request.entity';
@@ -56,24 +56,28 @@ export class LoanRequestService {
   constructor(
     private readonly loanRequestRepository: LoanRequestRepository,
     private readonly winstonLogger: WinstonLogger,
-    private readonly configService: ConfigService,
     private readonly httpService: HttpService,
+    @Inject('APP_CONFIG') private readonly config: AppConfig,
   ) {}
 
   private async callExternalWithTimeout(timeoutMs: number, context: string): Promise<void> {
-    const url = this.configService.get<string>('URL_EXTERNA_EJERCICIO')!;
+    const url = this.config.externalUrl;
     const maxRetries = 3;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const start = Date.now();
       try {
+        this.winstonLogger.info(`Llamada externa iniciada [${context}]`, { url, timeoutMs, attempt });
         await firstValueFrom(
           this.httpService.get(url, { timeout: timeoutMs }),
         );
+        this.winstonLogger.info(`Llamada externa exitosa [${context}]`, { durationMs: Date.now() - start, attempt });
         return;
       } catch {
+        const durationMs = Date.now() - start;
         const backoff = attempt * 200;
-        this.winstonLogger.warn(`Intento ${attempt}/${maxRetries} fallido [${context}], reintentando en ${backoff}ms`);
+        this.winstonLogger.warn(`Intento ${attempt}/${maxRetries} fallido [${context}], reintentando en ${backoff}ms`, context, { durationMs, attempt });
         if (attempt === maxRetries) {
-          this.winstonLogger.error(`Timeout en llamada externa [${context}] después de ${maxRetries} intentos`);
+          this.winstonLogger.error(`Timeout en llamada externa [${context}] después de ${maxRetries} intentos`, undefined, context, { durationMs, timeoutMs, url });
           throw new HttpException(`Timeout en servicio externo: ${context}`, HttpStatus.GATEWAY_TIMEOUT);
         }
         await new Promise((resolve) => setTimeout(resolve, backoff));
@@ -82,9 +86,17 @@ export class LoanRequestService {
   }
 
   async createLoanRequest(input: CreateLoanRequestInput): Promise<LoanRequestResponse> {
-    this.winstonLogger.info('Iniciando creación de solicitud de préstamo');
+    this.winstonLogger.info('Iniciando creación de solicitud de préstamo', {
+      operationNumber: input.operationNumber,
+      channel: input.channel,
+      requestedAmount: input.requestedAmount,
+      currency: input.currency,
+      termMonths: input.termMonths,
+      applicantDocument: input.applicantDocument,
+      destinationAccount: input.destinationAccount,
+    });
 
-    const idempotencyEnabled = this.configService.get<boolean>('IDEMPOTENCY_CHECK_ENABLED') ?? true;
+    const idempotencyEnabled = this.config.idempotency.checkEnabled;
 
     if (idempotencyEnabled) {
       const existing = await this.loanRequestRepository.findByOperationNumberAndChannel(
@@ -92,8 +104,14 @@ export class LoanRequestService {
         input.channel,
       );
       if (existing) {
-        this.winstonLogger.warn('Solicitud duplicada detectada - idempotencia');
-        return this.mapToResponse(existing);
+        this.winstonLogger.warn('Solicitud duplicada detectada - idempotencia', undefined, {
+          operationNumber: input.operationNumber,
+          channel: input.channel,
+        });
+        throw new HttpException(
+          { message: 'Solicitud duplicada', operationNumber: input.operationNumber, channel: input.channel },
+          HttpStatus.CONFLICT,
+        );
       }
     }
 
@@ -150,7 +168,7 @@ export class LoanRequestService {
   }
 
   async updateAntifraudResult(input: UpdateAntifraudResultInput): Promise<LoanRequestResponse> {
-    const timeoutMs = this.configService.get<number>('ANTIFRAUD_TIMEOUT_MS')!;
+    const timeoutMs = this.config.services.antifraud.timeout;
     await this.callExternalWithTimeout(timeoutMs, 'antifraud');
     this.winstonLogger.info('Actualizando resultado de antifraude', { requestId: input.id });
     const updated = await this.loanRequestRepository.updateAntifraudResult(input.id, input.result);
@@ -158,7 +176,7 @@ export class LoanRequestService {
   }
 
   async updateRiskBureauResult(input: UpdateRiskBureauResultInput): Promise<LoanRequestResponse> {
-    const timeoutMs = this.configService.get<number>('RISK_BUREAU_TIMEOUT_MS')!;
+    const timeoutMs = this.config.services.riskBureau.timeout;
     await this.callExternalWithTimeout(timeoutMs, 'risk-bureau');
     this.winstonLogger.info('Actualizando resultado del buró de riesgos', { requestId: input.id });
     const updated = await this.loanRequestRepository.updateRiskBureauResult(input.id, input.result);
@@ -166,7 +184,7 @@ export class LoanRequestService {
   }
 
   async updateCreditOriginatorResult(input: UpdateCreditOriginatorResultInput): Promise<LoanRequestResponse> {
-    const timeoutMs = this.configService.get<number>('CREDIT_ORIGINATOR_TIMEOUT_MS')!;
+    const timeoutMs = this.config.services.creditOriginator.timeout;
     await this.callExternalWithTimeout(timeoutMs, 'credit-originator');
     this.winstonLogger.info('Actualizando resultado del originador de crédito', { requestId: input.id });
     const updated = await this.loanRequestRepository.updateCreditOriginatorResult(input.id, input.result);
