@@ -56,7 +56,7 @@ interface AppConfig {
         DB_HOST: Joi.string().default('localhost'),
         DB_PORT: Joi.number().default(5432),
         DB_USERNAME: Joi.string().default('postgres'),
-        DB_PASSWORD: Joi.string().required(),
+        DB_PASSWORD: Joi.string(),
         DB_NAME: Joi.string().default('loan_db'),
         DATABASE_POOL_SIZE: Joi.number().default(10),
         DATABASE_CONNECT_TIMEOUT_MS: Joi.number().default(10000),
